@@ -1,7 +1,6 @@
 from aiogram import Router
-from .users import start, register
+from .users import start
 
 router = Router()
 
 router.include_router(start.router)
-router.include_router(register.router)
