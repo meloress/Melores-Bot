@@ -1,17 +1,6 @@
 import asyncio
 import logging
 import sys
-from aiogram import Bot, Dispatcher
-from data.config import BOT_TOKEN
-from handlers.users import start # Start handlerni import qilish
-from database.db import db
-
-async def main():
-    # Loglarni yoqish
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-import asyncio
-import logging
-import sys
 import os
 from aiogram import Bot, Dispatcher
 
@@ -19,50 +8,36 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN env var not set")
 
-# Eslatma: database.db faylingiz HANDLERLARNI import qilmasligi kerak
+# db obyekti: database/db.py ichida DB sinfi bo'lib, connect/create_tables/close metodlari mavjud deb hisoblaymiz
 from database.db import db
 
 async def main():
+    # Loglarni yoqish
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
 
     # ---------------- BAZANI ULASH ----------------
-    # DB moduli boshqa modullarni import qilmasligi kerak (circular import bo'lmasin)
+    # >>> MUHIM: bu kod async def ichida bo'lishi shart <<< 
     await db.connect()       # Ulanish
-    await db.create_tables() # Jadval yaratish
+    await db.create_tables() # Jadval yaratish (agar kerak bo'lsa)
     # ----------------------------------------------
 
-    # Handlerlarni import va ro'yxatdan o'tkazishni bazani ulagandan keyin qilamiz
-    # shunda import vaqtida DB/handlers o'rtasida sikl paydo bo'lmaydi.
+    # Handlerlarni ro'yxatga olishni DB ulanishidan keyin bajaraylik
     from handlers import register_all_handlers
     register_all_handlers(dp)
 
     try:
+        # aiogram v3: dp.start_polling() async funksiyadir
         await dp.start_polling(bot)
     finally:
-        await db.close()
-        await bot.session.close()  # Agar aiogram boshqa versiya bo'lsa, kerak bo'lsa bot.close() ga almashtiring
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-    bot = Bot(token=BOT_TOKEN)
-    dp = Dispatcher()
-
-    # Routerni ulash
-    dp.include_router(start.router)
-
-    # ---------------- BAZANI ULASH ----------------
-    await db.connect()       # Ulanish
-    await db.create_tables() # Jadval yaratish
-    # ----------------------------------------------
-
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await db.close() # Bot o'chganda bazani ham uzish
+        await db.close()                 # bazani uzish
+        # aiogram v3 uchun:
+        try:
+            await bot.session.close()
+        except Exception:
+            await bot.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
