@@ -1,5 +1,5 @@
 import asyncpg
-from config import DATABASE_URL
+from data.config import DATABASE_URL
 
 class Database:
     def __init__(self):
