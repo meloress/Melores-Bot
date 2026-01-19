@@ -17,5 +17,5 @@ def regions_kb():
         clean_name = region.replace("📍 ", "")
         builder.button(text=region, callback_data=f"reg:{clean_name}")
     
-    builder.adjust(2) # Ikkita ustun qilib joylash
+    builder.adjust(2) 
     return builder.as_markup()
