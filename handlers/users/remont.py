@@ -16,7 +16,7 @@ router = Router()
 # --------------------------------------------------------
 # 1. "🛠️  Ремонт кетяпти" 
 # --------------------------------------------------------
-@router.message(F.text == "🛠️  Ремонт кетяпти")
+@router.message(F.text.contains("Ремонт"))
 async def start_remont(message: Message):
     user_id = message.from_user.id
     
