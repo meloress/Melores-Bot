@@ -2,96 +2,73 @@ import asyncio
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-# Bazadan kerakli funksiyalarni chaqiramiz
-# Agar sizda 'db' obyekti queries.py da bo'lmasa, database.db dan oling
 from database.db import db 
 from database.queries import (
-    get_lesson, update_user_lesson,         # Yangi uy uchun
-    get_remont_lesson, update_user_remont   # Remont uchun
+    get_lesson, update_user_lesson,         
+    get_remont_lesson, update_user_remont,
+    update_last_message_id # Yangi
 )
 
 async def send_scheduled_lessons(bot: Bot):
-    print("⏰ Авто-дарслик юбориш бошланди...")
+    print("⏰ Авто-дарслик юбориш жараёни...")
 
-    # 1. Barcha aktiv (ban olmagan) userlarni olamiz
-    # Bizga ularning oxirgi ko'rgan dars ID lari kerak
     users = await db.fetch_all("""
-        SELECT telegram_id, last_lesson_id, last_remont_id 
+        SELECT telegram_id, last_lesson_id, last_remont_id, active_section, last_message_id
         FROM users 
-        WHERE is_banned = FALSE
+        WHERE is_banned = FALSE AND active_section IS NOT NULL
     """)
     
     if not users:
-        print("📭 Юбориш учун фойдаланувчилар йўқ.")
+        print("📭 Ҳозирча ҳеч ким видео кўриш жараёнида эмас.")
         return
-
-    sent_count = 0
 
     for user in users:
         user_id = user['telegram_id']
+        section = user['active_section']     
+        old_msg_id = user['last_message_id'] 
         
-        # ==========================================
-        # 1-YO'NALISH: YANGI UYLAR (Lessons)
-        # ==========================================
-        last_lesson = user['last_lesson_id'] or 0
-        next_lesson_id = last_lesson + 1
+        target_video = None
+        next_id = 0
+        update_func = None
+
         
-        # Bazadan keyingi darsni qidiramiz
-        lesson = await get_lesson(next_lesson_id)
+        if section == 'lesson':
+            next_id = (user['last_lesson_id'] or 0) + 1
+            target_video = await get_lesson(next_id)
+            update_func = update_user_lesson
+
         
-        if lesson:
+        elif section == 'remont':
+            next_id = (user['last_remont_id'] or 0) + 1
+            target_video = await get_remont_lesson(next_id) 
+            update_func = update_user_remont
+        
+       
+        if target_video:
             try:
-                # Tugma (Kirillcha)
+                if old_msg_id:
+                    try:
+                        await bot.edit_message_reply_markup(chat_id=user_id, message_id=old_msg_id, reply_markup=None)
+                    except Exception:
+                        pass 
                 builder = InlineKeyboardBuilder()
-                builder.button(text="Кейингиси ➡️", callback_data="next_lesson") # Kirillcha
+                callback_val = "next_lesson" if section == 'lesson' else "next_remont_lesson"
+                builder.button(text="Кейингиси ➡️", callback_data=callback_val)
 
-                caption_text = f"<b>#{lesson['id']} - Видеодарс (🏠 Янги уй)</b>\n\n{lesson['caption']}"
+                caption_text = target_video['caption']
 
-                await bot.send_video(
+                sent_msg = await bot.send_video(
                     chat_id=user_id,
-                    video=lesson['file_id'],
+                    video=target_video['file_id'],
                     caption=caption_text,
                     reply_markup=builder.as_markup()
                 )
-                
-                # Bazani yangilaymiz (User 8-ni ko'rdi deb yozamiz)
-                await update_user_lesson(user_id, next_lesson_id)
-                sent_count += 1
-                await asyncio.sleep(0.05) # Spamdan saqlanish
+                await update_func(user_id, next_id)
+                await update_last_message_id(user_id, sent_msg.message_id)
+
+                await asyncio.sleep(0.05) 
 
             except Exception as e:
-                # Agar user bloklagan bo'lsa
-                pass
-
-        # ==========================================
-        # 2-YO'NALISH: REMONT (Remont Lessons)
-        # ==========================================
-        last_remont = user['last_remont_id'] or 0
-        next_remont_id = last_remont + 1
-        
-        remont_lesson = await get_remont_lesson(next_remont_id)
-        
-        if remont_lesson:
-            try:
-                # Tugma (Kirillcha)
-                builder_rem = InlineKeyboardBuilder()
-                builder_rem.button(text="Кейингиси ➡️", callback_data="next_remont_lesson")
-
-                caption_rem = f"<b>#{remont_lesson['id']} - Видеодарс (🛠 Ремонт)</b>\n\n{remont_lesson['caption']}"
-
-                await bot.send_video(
-                    chat_id=user_id,
-                    video=remont_lesson['file_id'],
-                    caption=caption_rem,
-                    reply_markup=builder_rem.as_markup()
-                )
-                
-                # Bazani yangilaymiz
-                await update_user_remont(user_id, next_remont_id)
-                sent_count += 1
-                await asyncio.sleep(0.05)
-
-            except Exception:
                 pass
     
-    print(f"🏁 Авто-дарслик тарқатиш тугади. Жами {sent_count} та хабар юборилди.")
+    print("🏁 Тарқатиш тугади.")
