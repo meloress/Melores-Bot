@@ -4,7 +4,9 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from middlewares.check_ban import BanCheckMiddleware
 from data.config import BOT_TOKEN
 from database.db import db
@@ -18,36 +20,46 @@ async def main():
         token=BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
+    
     dp = Dispatcher()
+    
     dp.message.middleware(BanCheckMiddleware())
     dp.callback_query.middleware(BanCheckMiddleware())
-    print("⏳ Baza ulanmoqda...")
+
+    print("⏳ База уланмоқда...")
     await db.connect()
     await db.create_tables()
-    print("✅ Baza ulandi!")
+    print("✅ База уланди!")
 
     register_all_handlers(dp)
 
+    # =================================================
+    # ⏰ SCHEDULER (VAQT SOZLAMALARI)
+    # =================================================
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     
-    scheduler.add_job(send_scheduled_lessons, 'cron', hour=10, minute=0, args=[bot])
+    scheduler.add_job(send_scheduled_lessons, 'cron', hour=5, minute=25, args=[bot])
     scheduler.add_job(send_scheduled_lessons, 'cron', hour=16, minute=0, args=[bot])
     
     scheduler.start()
-    print("⏰ Jadval (10:00 va 16:00) ishga tushdi...")
+    print("⏰ Жадвал (10:00 ва 16:00) ишга тушди...")
+    # =================================================
 
+    # Eski "kutib turgan" update'larni o'chiramiz (bot tezroq ishlashi uchun)
     await bot.delete_webhook(drop_pending_updates=True)
-    print("🚀 Bot ishga tushdi (eski xabarlar tozalandi)!")
+    print("🚀 Бот ишга тушди!")
 
     try:
         await dp.start_polling(bot)
     finally:
-        print("🛑 Bot to'xtatilmoqda...")
+        print("🛑 Бот тўхтатилмоқда...")
         await db.close()
         await bot.session.close()
 
 if __name__ == "__main__":
     try:
+        if sys.platform == 'win32':
+             asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         print("Bot to'xtatildi!")
