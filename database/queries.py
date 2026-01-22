@@ -214,3 +214,9 @@ async def get_template(template_id: int):
 
 async def delete_template(template_id: int):
     await db.execute("DELETE FROM mailing_templates WHERE id = $1", template_id)
+
+async def update_active_section(telegram_id: int, section: str):
+    await db.execute("UPDATE users SET active_section = $1 WHERE telegram_id = $2", section, telegram_id)
+
+async def update_last_message_id(telegram_id: int, message_id: int):
+    await db.execute("UPDATE users SET last_message_id = $1 WHERE telegram_id = $2", message_id, telegram_id)    
