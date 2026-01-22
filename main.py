@@ -38,8 +38,8 @@ async def main():
     # =================================================
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     
-    scheduler.add_job(send_scheduled_lessons, 'cron', hour=6, minute=32, args=[bot])
-    scheduler.add_job(send_scheduled_lessons, 'cron', hour=6, minute=33, args=[bot])
+    scheduler.add_job(send_scheduled_lessons, 'cron', hour=6, minute=39, args=[bot])
+    scheduler.add_job(send_scheduled_lessons, 'cron', hour=6, minute=40, args=[bot])
     
     scheduler.start()
     print("⏰ Жадвал (10:00 ва 16:00) ишга тушди...")
