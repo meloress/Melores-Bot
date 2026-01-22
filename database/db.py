@@ -29,7 +29,7 @@ class Database:
         CREATE TABLE IF NOT EXISTS users (
             telegram_id BIGINT PRIMARY KEY,
             full_name TEXT,
-            username TEXT,             -- Username
+            username TEXT,            -- Username
             phone TEXT,
             region TEXT,
             last_lesson_id INTEGER DEFAULT 0,  -- Yangi uylar
@@ -116,18 +116,36 @@ class Database:
         """)
 
         # ---------------------------------------------------------
-        # 7. MAILING TEMPLATES (SHABLONLAR) - YANGI
+        # 7. MAILING TEMPLATES (SHABLONLAR)
         # ---------------------------------------------------------
         await self.execute("""
         CREATE TABLE IF NOT EXISTS mailing_templates (
             id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,         -- Shablon nomi
-            msg_type TEXT,              -- 'text', 'photo', 'video'
-            file_id TEXT,               -- Agar media bo'lsa
-            caption TEXT,               -- Matn
+            name TEXT NOT NULL,        -- Shablon nomi
+            msg_type TEXT,             -- 'text', 'photo', 'video'
+            file_id TEXT,              -- Agar media bo'lsa
+            caption TEXT,              -- Matn
             created_at TIMESTAMP DEFAULT NOW()
         );
         """)
+
+        # ---------------------------------------------------------
+        # 🔥 8. MIGRATSIYA: YANGI KERAKLI USTUNLAR (VORONKA UCHUN)
+        # ---------------------------------------------------------
+        # Bu qism avtomatik ishlaydi va yo'q bo'lsa qo'shib qo'yadi
+        
+        try: 
+            # User hozir qaysi bo'limda ekanligini bilish uchun ('lesson', 'remont', 'about')
+            await self.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS active_section TEXT DEFAULT NULL;")
+        except Exception as e: 
+            print(f"Migratsiya (active_section): {e}")
+
+        try: 
+            # Oxirgi yuborilgan xabar ID sini saqlash (Tugmani o'chirish uchun)
+            await self.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_message_id BIGINT DEFAULT 0;")
+        except Exception as e: 
+            print(f"Migratsiya (last_message_id): {e}")
+
         
         print("✅ Barcha jadvallar (Users, Media, Lessons, Remont, About, Admins, Templates) tayyor!")
 
