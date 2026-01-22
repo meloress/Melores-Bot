@@ -6,7 +6,7 @@ from database.db import db
 from database.queries import (
     get_lesson, update_user_lesson,         
     get_remont_lesson, update_user_remont,
-    update_last_message_id # Yangi
+    update_last_message_id 
 )
 
 async def send_scheduled_lessons(bot: Bot):
@@ -30,29 +30,32 @@ async def send_scheduled_lessons(bot: Bot):
         target_video = None
         next_id = 0
         update_func = None
+        callback_val = ""
 
-        
         if section == 'lesson':
             next_id = (user['last_lesson_id'] or 0) + 1
             target_video = await get_lesson(next_id)
             update_func = update_user_lesson
+            callback_val = "next_lesson" 
 
-        
         elif section == 'remont':
             next_id = (user['last_remont_id'] or 0) + 1
             target_video = await get_remont_lesson(next_id) 
             update_func = update_user_remont
+            callback_val = "next_remont" 
         
-       
-        if target_video:
+        elif section == 'about':
+            pass
+
+        if target_video and callback_val:
             try:
                 if old_msg_id:
                     try:
                         await bot.edit_message_reply_markup(chat_id=user_id, message_id=old_msg_id, reply_markup=None)
                     except Exception:
                         pass 
+
                 builder = InlineKeyboardBuilder()
-                callback_val = "next_lesson" if section == 'lesson' else "next_remont_lesson"
                 builder.button(text="Кейингиси ➡️", callback_data=callback_val)
 
                 caption_text = target_video['caption']
@@ -63,6 +66,7 @@ async def send_scheduled_lessons(bot: Bot):
                     caption=caption_text,
                     reply_markup=builder.as_markup()
                 )
+                
                 await update_func(user_id, next_id)
                 await update_last_message_id(user_id, sent_msg.message_id)
 
