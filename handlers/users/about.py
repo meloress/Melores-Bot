@@ -6,7 +6,6 @@ from database.queries import (
     select_user, 
     get_about_lesson, 
     update_user_about,
-    update_active_section,   
     update_last_message_id   
 )
 
@@ -19,8 +18,7 @@ router = Router()
 async def start_about(message: Message):
     user_id = message.from_user.id
     
-    await update_active_section(user_id, "about")
-
+    
     user = await select_user(user_id)
     
     if user:
@@ -40,8 +38,7 @@ async def start_about(message: Message):
 async def next_about_handler(call: CallbackQuery):
     user_id = call.from_user.id
     
-    await update_active_section(user_id, "about")
-
+    
     user = await select_user(user_id)
     
     current_level = user['last_about_id']
