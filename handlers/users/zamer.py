@@ -4,7 +4,6 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardB
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-# set_zamer_flag ni ham import qildik
 from database.queries import select_user, add_user, set_zamer_flag
 from states.registration import ZamerState
 from data.config import MAIN_GROUP_ID, TOPIC_ID_ZAMER
@@ -24,7 +23,6 @@ async def show_zamer_card(bot, chat_id, user_id):
         await bot.send_message(chat_id, "⚠️ Илтимос, аввал /start босиб рўйхатдан ўтинг.")
         return
 
-    # User ma'lumotlarini tayyorlaymiz
     text = (
         "👷‍♂️ <b>Замер учун аризангизни қабул қиламиз!</b>\n\n"
         "Биз сиз билан боғланишимиз учун қуйидаги маълумотлардан фойдаланамиз:\n\n"
@@ -33,13 +31,11 @@ async def show_zamer_card(bot, chat_id, user_id):
         "👇 <i>Маълумотлар тўғри эканлигини тасдиқланг ёки таҳрирланг:</i>"
     )
 
-    # Tugmalar
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Тасдиқлаш (Юбориш)", callback_data="confirm_zamer")
     builder.button(text="✏️ Таҳрирлаш", callback_data="edit_zamer_start")
     builder.adjust(1)
 
-    # Izohli matn
     info_text = (
         "\n➖➖➖➖➖➖➖➖➖➖\n"
         "✅ <b>Тасдиқлаш</b> — Аризангизни дарҳол мутахассисларга юборишади.\n"
@@ -54,7 +50,6 @@ async def show_zamer_card(bot, chat_id, user_id):
 # --------------------------------------------------------
 @router.message(F.text == "📐 Замер белгилаш")
 async def start_zamer_process(message: Message):
-    # Bu yerda message.from_user.id - bu Userning o'zi
     await show_zamer_card(message.bot, message.chat.id, message.from_user.id)
 
 
@@ -64,10 +59,7 @@ async def start_zamer_process(message: Message):
 @router.callback_query(F.data == "go_to_zamer_process")
 async def inline_zamer_trigger(call: CallbackQuery):
     await call.message.delete()
-    
-    # call.from_user.id - bu tugmani bosgan User ID si.
     await show_zamer_card(call.bot, call.message.chat.id, call.from_user.id)
-    
     await call.answer()
 
 
@@ -79,17 +71,13 @@ async def submit_zamer(call: CallbackQuery):
     user_id = call.from_user.id
     user = await select_user(user_id)
 
-    # Username yoki Link
     if call.from_user.username:
         user_link = f"@{call.from_user.username}"
     else:
         user_link = f"<a href='tg://user?id={user_id}'>{user['full_name']}</a>"
 
-    # --- YANGI QO'SHILDI: BAZAGA ZAMER BOSDI DEB YOZISH ---
     await set_zamer_flag(user_id) 
-    # ------------------------------------------------------
 
-    # Admin shablon
     admin_msg = (
         f"📏 <b>YANGI ZAMER BUYURTMASI!</b>\n"
         f"➖➖➖➖➖➖➖➖➖➖\n"
@@ -175,14 +163,12 @@ async def edit_phone(message: Message, state: FSMContext):
     user = await select_user(message.from_user.id)
     region = user['region'] if user else "Noma'lum"
 
-    # --- USERNAME OLISH (XATOLIK SHU YERDA EDI) ---
     username = message.from_user.username
 
-    # Bazani yangilash
     await add_user(
         telegram_id=message.from_user.id,
         full_name=new_name,
-        username=username, # <--- MANA SHU QATOR QO'SHILDI
+        username=username,
         phone=final_phone,
         region=region
     )
@@ -191,6 +177,4 @@ async def edit_phone(message: Message, state: FSMContext):
     await loader.delete()
 
     await state.clear()
-
-    # Yana zamer kartasini chiqaramiz (Yangilangan holda)
     await show_zamer_card(message.bot, message.chat.id, message.from_user.id)
