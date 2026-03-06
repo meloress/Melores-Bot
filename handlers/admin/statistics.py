@@ -78,9 +78,11 @@ async def download_excel(call: CallbackQuery):
     # -------------------------------------------------------------------------
     
     def format_progress(current_val, max_val):
-        if max_val == 0: return "0% (0)"
+        if max_val == 0:
+            return "0% (0)"
         current_val = int(current_val)
-        if current_val > max_val: current_val = max_val
+        if current_val > max_val:
+            current_val = max_val
             
         percent = int((current_val / max_val) * 100)
         return f"{percent}% ({current_val})"
@@ -99,7 +101,8 @@ async def download_excel(call: CallbackQuery):
 
     # E) Sana
     if 'created_at' in df.columns:
-        df['created_at'] = df['created_at'].astype(str).str[:16] # 2024-10-12 14:30
+        df['created_at'] = df['created_at'].astype(str).str[:16]  # 2024-10-12 14:30
+
     df = df.rename(columns={
         "telegram_id": "Telegram ID",
         "full_name": "Ism Familiya",
@@ -111,6 +114,7 @@ async def download_excel(call: CallbackQuery):
         "last_about_id": "ℹ️ Biz haqimizda",
         "zamer_requested": "📏 Zamer bosganmi?"
     })
+
     output = io.BytesIO()
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -120,8 +124,8 @@ async def download_excel(call: CallbackQuery):
         
         for i, column in enumerate(df.columns):
             max_len = max(
-                df[column].astype(str).map(len).max(),
-                len(column)
+                df[column].fillna("").astype(str).map(len).max(),
+                len(str(column))
             )
             worksheet.column_dimensions[get_column_letter(i + 1)].width = max_len + 3
 
