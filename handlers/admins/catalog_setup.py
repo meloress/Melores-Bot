@@ -2,7 +2,7 @@ import asyncio
 
 from aiogram import Router, F
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message
+from aiogram.types import Message, BufferedInputFile
 
 from data.catalog import CATEGORIES
 from data.config import CATALOG_GROUP_ID, SUPER_ADMIN_ID
@@ -21,6 +21,11 @@ router = Router()
 
 # Katalog buyruqlari va media faqat katalog guruhida ishlaydi
 IN_CATALOG_GROUP = F.chat.id == CATALOG_GROUP_ID
+
+MAX_DOWNLOAD_SIZE = 20 * 1024 * 1024   # Bot API getFile chegarasi
+
+# Fayllarni bittalab o'giramiz — 50 ta faylni birdan yuklash flood limitga uradi
+_convert_limit = asyncio.Semaphore(2)
 
 # ponytail: albom (media_group) uchun bitta tasdiq xabari yuborish uchun
 # oxirgi ko'rilgan guruh ID si eslab qolinadi. Albomlar ketma-ket kelgani uchun
@@ -168,6 +173,79 @@ async def _report_saved(message: Message, key: str, delay: float):
         await message.reply(f"✅ Saqlandi · <b>{CATEGORIES.get(key, key)}</b> — jami {total} ta")
     except Exception as e:
         print(f"Katalog tasdig'ini yuborishda xatolik: {e}")
+
+
+@router.message(IN_CATALOG_GROUP, F.document, bound_topic)
+async def convert_document(message: Message, key: str):
+    """Fayl ko'rinishidagi rasm/videoni oddiy rasm/videoga o'giradi.
+
+    file_id ning turini o'zgartirib bo'lmaydi (Telegram taqiqlaydi), shuning uchun
+    bot faylni yuklab olib, topicka rasm/video sifatida qayta yuklaydi va
+    yangi file_id ni saqlaydi. Shunda user albom ko'rinishida ko'radi.
+    """
+    global _last_group_id
+
+    doc = message.document
+    mime = doc.mime_type or ""
+    is_photo, is_video = mime.startswith("image/"), mime.startswith("video/")
+
+    if not (is_photo or is_video):
+        await message.reply(f"⚠️ Faqat rasm va video qabul qilinadi (bu: <code>{mime or '?'}</code>).")
+        return
+
+    if doc.file_size and doc.file_size > MAX_DOWNLOAD_SIZE:
+        mb = doc.file_size // 1024 // 1024
+        await message.reply(
+            f"⚠️ <b>Fayl juda katta ({mb} MB) — saqlanmadi.</b>\n\n"
+            "Bot 20 MB dan katta faylni yuklab ololmaydi (Telegram cheklovi).\n"
+            "Buni rasm/video sifatida tashlang — u holda hajm muammo emas."
+        )
+        return
+
+    # Bir vaqtda hammasini yuklamaymiz — flood limit va xotira uchun
+    async with _convert_limit:
+        try:
+            data = await message.bot.download(doc)
+            buf = BufferedInputFile(data.read(), filename=doc.file_name or "media")
+
+            if is_photo:
+                sent = await message.bot.send_photo(
+                    chat_id=message.chat.id,
+                    message_thread_id=message.message_thread_id,
+                    photo=buf,
+                    caption=message.caption,
+                )
+                media_type, file_id = "photo", sent.photo[-1].file_id
+            else:
+                sent = await message.bot.send_video(
+                    chat_id=message.chat.id,
+                    message_thread_id=message.message_thread_id,
+                    video=buf,
+                    caption=message.caption,
+                )
+                media_type, file_id = "video", sent.video.file_id
+
+        except Exception as e:
+            print(f"Faylni o'girishda xatolik ({key}): {e}")
+            await message.reply(f"❌ <b>Faylni o'girib bo'lmadi — saqlanmadi.</b>\n<code>{e}</code>")
+            return
+
+    # src_msg_id — bot yuklagan yangi xabarniki (hujjatniki emas)
+    await add_catalog_item(
+        category=key,
+        media_type=media_type,
+        file_id=file_id,
+        caption=message.caption,
+        src_msg_id=sent.message_id,
+    )
+
+    if message.media_group_id:
+        if message.media_group_id == _last_group_id:
+            return
+        _last_group_id = message.media_group_id
+        asyncio.create_task(_report_saved(message, key, delay=10.0))
+    else:
+        await _report_saved(message, key, delay=0)
 
 
 @router.message(IN_CATALOG_GROUP, F.photo | F.video, bound_topic)
