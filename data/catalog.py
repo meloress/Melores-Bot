@@ -12,13 +12,13 @@ CATEGORIES = {
     "detskiy":    "👶 Детский мебель",
     "kuxnya":     "🍳 Нео ва Классика кухня",
     "akril_kux":  "🚪 Эшик акрил кухня",
+    "yumshoq":    "🛋 Юмшоқ мебель",
+    "eshik":      "🚪 Эшиклар",
     "hotel":      "🏨 Отель учун мебель",
     "ofis":       "💼 Офис мебель",
-    "shkaf_ichi": "🗄 Шкаф ички кўриниши",
     # 🎨 Material va fasadlar
     "akril":      "🎨 Акрил каталоги",
     "rover":      "🚪 Rover фасад турлари",
-    "egger":      "🌲 Egger ультрадекор / Кроноспан",
     "ruchka":     "🔩 Ручкалар каталоги",
     "obshivka":   "🪵 Обшивкалар",
 }
@@ -26,10 +26,11 @@ CATEGORIES = {
 GROUPS = {
     "mebel": ("🛋 Мебель бўлимлари", [
         "garderob", "prixojka", "polniy_uy", "spalniy", "zal", "sanuzel",
-        "detskiy", "kuxnya", "akril_kux", "hotel", "ofis", "shkaf_ichi",
+        "detskiy", "kuxnya", "akril_kux", "yumshoq", "eshik",
+        "hotel", "ofis",
     ]),
     "material": ("🎨 Материал ва фасадлар", [
-        "akril", "rover", "egger", "ruchka", "obshivka",
+        "akril", "rover", "ruchka", "obshivka",
     ]),
 }
 
