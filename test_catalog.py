@@ -1,4 +1,8 @@
 """Katalog mantig'ining tez tekshiruvi: python test_catalog.py"""
+import asyncio
+
+from aiogram.exceptions import TelegramBadRequest
+
 from data.catalog import CATEGORIES, GROUPS, PAGE_SIZE
 
 
@@ -15,6 +19,74 @@ def paginate(total, page_size=PAGE_SIZE):
             break
         offset = last
     return pages
+
+
+class FakeBot:
+    """Berilgan file_id lar uchun xato qaytaradigan soxta bot"""
+
+    def __init__(self, fails: dict):
+        self.fails = fails          # {file_id: Exception}
+        self.sent = []
+
+    async def _send(self, chat_id, file_id, caption=None):
+        if file_id in self.fails:
+            raise self.fails[file_id]
+        self.sent.append(file_id)
+
+    send_photo = send_video = _send
+
+    async def send_media_group(self, chat_id, media):
+        for m in media:
+            if m.media in self.fails:
+                raise self.fails[m.media]
+        self.sent.extend(m.media for m in media)
+
+
+class NoSleep:
+    """asyncio.sleep ni bekor qiladi — test tez tugasin"""
+    @staticmethod
+    async def sleep(_):
+        return
+
+
+def check_self_healing():
+    """Albom yiqilganda: buzuq fayl o'chirilsin, tarmoq xatosi O'CHIRMASIN"""
+    import handlers.users.catalog as cat
+
+    items = [{"media_type": "photo", "file_id": f"f{i}"} for i in range(10)]
+    bad_request = TelegramBadRequest(method=None, message="wrong file identifier")
+
+    cat.asyncio = NoSleep()
+    deleted_ids = []
+
+    async def fake_delete(file_id):
+        deleted_ids.append(file_id)
+
+    cat.delete_catalog_item = fake_delete
+
+    # 1. Buzuq fayl (Telegram uni tanimayapti) -> o'chirilsin
+    bot = FakeBot({"f3": bad_request})
+    sent, deleted = asyncio.run(cat.send_items(bot, 1, items, "izoh"))
+    assert (sent, deleted) == (9, 1), (sent, deleted)
+    assert deleted_ids == ["f3"], deleted_ids
+    assert "f3" not in bot.sent
+
+    # 2. Tarmoq xatosi -> o'tkazib yuborilsin, lekin BAZADAN O'CHIRILMASIN
+    deleted_ids.clear()
+    bot = FakeBot({"f5": ConnectionError("tarmoq uzildi")})
+    sent, deleted = asyncio.run(cat.send_items(bot, 1, items, "izoh"))
+    assert (sent, deleted) == (9, 0), (sent, deleted)
+    assert deleted_ids == [], f"tarmoq xatosida media o'chirildi: {deleted_ids}"
+
+    # 3. Hammasi joyida -> albom bitta bo'lib ketsin, bittalab emas
+    bot = FakeBot({})
+    sent, deleted = asyncio.run(cat.send_items(bot, 1, items, "izoh"))
+    assert (sent, deleted) == (10, 0)
+    assert len(bot.sent) == 10
+
+    # 4. Keyingi sahifa offseti: o'chirilganlar surib qo'yadi, o'tkazilganlar yo'q
+    assert 0 + len(items) - 1 == 9    # 1 ta o'chdi -> keyingisi 9 dan
+    assert 0 + len(items) - 0 == 10   # 1 ta o'tkazildi -> keyingisi 10 dan
 
 
 def demo():
@@ -47,7 +119,9 @@ def demo():
     assert paginate(10) == [(1, 10)]          # bitta sahifa -> "Яна" tugmasi chiqmaydi
     assert paginate(0) == []                  # bo'sh katalog -> alohida xabar
 
-    print(f"OK: {len(CATEGORIES)} ta katalog, {len(GROUPS)} ta guruh")
+    check_self_healing()
+
+    print(f"OK: {len(CATEGORIES)} ta katalog, {len(GROUPS)} ta guruh, self-healing ishlaydi")
 
 
 if __name__ == "__main__":

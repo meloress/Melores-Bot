@@ -1,4 +1,7 @@
+import asyncio
+
 from aiogram import Router, F
+from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 from aiogram.types import (
     Message, CallbackQuery, InlineKeyboardButton,
     InputMediaPhoto, InputMediaVideo
@@ -10,6 +13,7 @@ from database.queries import (
     get_catalog_page,
     count_catalog,
     count_all_catalogs,
+    delete_catalog_item,
     update_active_section,
 )
 
@@ -99,6 +103,59 @@ async def catalog_page(call: CallbackQuery):
     await send_catalog_page(call.bot, call.from_user.id, key, offset)
 
 
+async def send_one(bot, chat_id, item, caption=None):
+    send = bot.send_photo if item['media_type'] == "photo" else bot.send_video
+    await send(chat_id, item['file_id'], caption=caption)
+
+
+async def send_items(bot, chat_id, items, caption):
+    """Avval albom bilan yuboradi. Albom yiqilsa — bittalab yuboradi va
+    yaroqsiz fayllarni bazadan o'chirib tashlaydi (katalog o'zini o'zi tozalaydi).
+
+    (yuborilganlar soni, bazadan o'chirilganlar soni) qaytaradi.
+    """
+    try:
+        if len(items) == 1:
+            await send_one(bot, chat_id, items[0], caption)
+        else:
+            media = [
+                (InputMediaPhoto if it['media_type'] == "photo" else InputMediaVideo)(
+                    media=it['file_id'],
+                    caption=caption if i == 0 else None
+                )
+                for i, it in enumerate(items)
+            ]
+            await bot.send_media_group(chat_id, media)
+        return len(items), 0
+    except Exception as e:
+        print(f"Albom yiqildi ({chat_id}), bittalab urinamiz: {e}")
+
+    sent, deleted = 0, 0
+    for item in items:
+        try:
+            await send_one(bot, chat_id, item, caption if sent == 0 else None)
+            sent += 1
+            await asyncio.sleep(0.3)   # ketma-ket 10 ta xabar — flood limitdan saqlanish
+        except TelegramRetryAfter as e:
+            # "Sekinroq" degani — fayl buzuq emas. Kutamiz, bir marta qayta urinamiz.
+            await asyncio.sleep(e.retry_after)
+            try:
+                await send_one(bot, chat_id, item, caption if sent == 0 else None)
+                sent += 1
+            except Exception as e2:
+                print(f"Flood limit, o'tkazib yuborildi: {e2}")
+        except TelegramBadRequest as e:
+            # Telegram faylni tanimayapti — bu haqiqatan buzuq, bazadan o'chiramiz
+            await delete_catalog_item(item['file_id'])
+            deleted += 1
+            print(f"Buzuq media bazadan o'chirildi ({item['file_id'][:15]}...): {e}")
+        except Exception as e:
+            # Tarmoq xatosi va h.k. — o'tkazib yuboramiz, lekin O'CHIRMAYMIZ
+            print(f"Yuborilmadi, o'tkazib yuborildi: {e}")
+
+    return sent, deleted
+
+
 async def send_catalog_page(bot, chat_id, key, offset):
     name = CATEGORIES[key]
     total = await count_catalog(key)
@@ -131,24 +188,17 @@ async def send_catalog_page(bot, chat_id, key, offset):
     # ----------------------------------------------------
     # B) MEDIA YUBORISH
     # ----------------------------------------------------
-    try:
-        if len(items) == 1:
-            item = items[0]
-            send = bot.send_photo if item['media_type'] == "photo" else bot.send_video
-            await send(chat_id, item['file_id'], caption=caption)
-        else:
-            media = [
-                (InputMediaPhoto if it['media_type'] == "photo" else InputMediaVideo)(
-                    media=it['file_id'],
-                    caption=caption if i == 0 else None
-                )
-                for i, it in enumerate(items)
-            ]
-            await bot.send_media_group(chat_id, media)
-    except Exception as e:
-        print(f"Каталог юборишда хатолик ({chat_id}, {key}): {e}")
+    sent, deleted = await send_items(bot, chat_id, items, caption)
+
+    if sent == 0:
         await bot.send_message(chat_id, "⚠️ Расмларни юборишда хатолик. Бироздан сўнг қайта уриниб кўринг.")
         return
+
+    if deleted:
+        total = await count_catalog(key)   # buzuq media bazadan chiqarildi
+
+    # O'chirilganlar keyingi sahifani surib qo'yadi, o'tkazib yuborilganlar esa yo'q
+    last = offset + len(items) - deleted
 
     # ----------------------------------------------------
     # C) BOSHQARUV TUGMALARI (albomga tugma qo'yib bo'lmaydi)

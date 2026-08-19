@@ -267,6 +267,11 @@ async def count_all_catalogs():
     return {r['category']: r['count'] for r in rows}
 
 
+async def delete_catalog_item(file_id: str):
+    """Yaroqsiz media'ni bazadan olib tashlash"""
+    await db.execute("DELETE FROM catalog_items WHERE file_id = $1", file_id)
+
+
 async def clear_catalog(category: str):
     await db.execute("DELETE FROM catalog_items WHERE category = $1", category)
 
