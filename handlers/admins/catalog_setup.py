@@ -1,6 +1,7 @@
 import asyncio
 
 from aiogram import Router, F
+from aiogram.exceptions import TelegramRetryAfter
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message, BufferedInputFile
 
@@ -202,29 +203,40 @@ async def convert_document(message: Message, key: str):
         )
         return
 
+    async def upload():
+        """Faylni yuklab olib, topicka rasm/video sifatida qayta yuklaydi"""
+        data = await message.bot.download(doc)
+        buf = BufferedInputFile(data.read(), filename=doc.file_name or "media")
+        if is_photo:
+            m = await message.bot.send_photo(
+                chat_id=message.chat.id,
+                message_thread_id=message.message_thread_id,
+                photo=buf,
+                caption=message.caption,
+            )
+            return "photo", m.photo[-1].file_id, m
+        m = await message.bot.send_video(
+            chat_id=message.chat.id,
+            message_thread_id=message.message_thread_id,
+            video=buf,
+            caption=message.caption,
+        )
+        return "video", m.video.file_id, m
+
     # Bir vaqtda hammasini yuklamaymiz — flood limit va xotira uchun
     async with _convert_limit:
         try:
-            data = await message.bot.download(doc)
-            buf = BufferedInputFile(data.read(), filename=doc.file_name or "media")
-
-            if is_photo:
-                sent = await message.bot.send_photo(
-                    chat_id=message.chat.id,
-                    message_thread_id=message.message_thread_id,
-                    photo=buf,
-                    caption=message.caption,
-                )
-                media_type, file_id = "photo", sent.photo[-1].file_id
-            else:
-                sent = await message.bot.send_video(
-                    chat_id=message.chat.id,
-                    message_thread_id=message.message_thread_id,
-                    video=buf,
-                    caption=message.caption,
-                )
-                media_type, file_id = "video", sent.video.file_id
-
+            media_type, file_id, sent = await upload()
+        except TelegramRetryAfter as e:
+            # Ko'p fayl birdan tashlansa Telegram "sekinroq" deydi — kutamiz va qayta urinamiz
+            print(f"Flood limit, {e.retry_after}s kutamiz ({key})")
+            await asyncio.sleep(e.retry_after + 1)
+            try:
+                media_type, file_id, sent = await upload()
+            except Exception as e2:
+                print(f"Faylni o'girishda xatolik ({key}): {e2}")
+                await message.reply(f"❌ <b>Faylni o'girib bo'lmadi — saqlanmadi.</b>\n<code>{e2}</code>")
+                return
         except Exception as e:
             print(f"Faylni o'girishda xatolik ({key}): {e}")
             await message.reply(f"❌ <b>Faylni o'girib bo'lmadi — saqlanmadi.</b>\n<code>{e}</code>")
