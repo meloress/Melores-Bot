@@ -1,0 +1,11 @@
+# Maxfiy ma'lumotlar — hech qachon repoga tushmasin
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Hisobotlar (Excel eksport)
+*.xlsx

@@ -130,7 +130,32 @@ class Database:
         """)
 
         # ---------------------------------------------------------
-        # 🔥 8. MIGRATSIYA: YANGI KERAKLI USTUNLAR (VORONKA UCHUN)
+        # 8. KATALOG (Rasm/video to'plamlari)
+        # ---------------------------------------------------------
+        await self.execute("""
+        CREATE TABLE IF NOT EXISTS catalog_items (
+            id SERIAL PRIMARY KEY,
+            category TEXT NOT NULL,
+            media_type TEXT NOT NULL,      -- 'photo' yoki 'video'
+            file_id TEXT NOT NULL,
+            caption TEXT,
+            src_msg_id BIGINT UNIQUE       -- guruhdagi xabar ID (takror saqlamaslik uchun)
+        );
+        """)
+        await self.execute(
+            "CREATE INDEX IF NOT EXISTS catalog_items_cat_idx ON catalog_items (category, src_msg_id);"
+        )
+
+        # Topic (mavzu) -> katalog bog'lami. Guruhda /bind <kalit> orqali to'ldiriladi.
+        await self.execute("""
+        CREATE TABLE IF NOT EXISTS catalog_topics (
+            thread_id BIGINT PRIMARY KEY,
+            category TEXT NOT NULL
+        );
+        """)
+
+        # ---------------------------------------------------------
+        # 🔥 9. MIGRATSIYA: YANGI KERAKLI USTUNLAR (VORONKA UCHUN)
         # ---------------------------------------------------------
         # Bu qism avtomatik ishlaydi va yo'q bo'lsa qo'shib qo'yadi
         

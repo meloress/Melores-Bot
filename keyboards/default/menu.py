@@ -7,7 +7,10 @@ main_menu = ReplyKeyboardMarkup(
             KeyboardButton(text="🛠️  Ремонт кетяпти"),
         ],
         [
-            KeyboardButton(text="ℹ️ Биз ҳақимизда"),  
+            KeyboardButton(text="📚 Каталог"),
+        ],
+        [
+            KeyboardButton(text="ℹ️ Биз ҳақимизда"),
             KeyboardButton(text="📐 Замер белгилаш"),
         ],
         [

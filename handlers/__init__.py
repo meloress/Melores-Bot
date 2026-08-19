@@ -2,6 +2,7 @@ from aiogram import Dispatcher
 
 # Admin handlerlar
 from .admins.media_setup import router as media_router
+from .admins.catalog_setup import router as catalog_setup_router
 from .admin.statistics import router as statistics_router
 from .admin.panel import router as panel_router
 from .admin.crm import router as crm_router
@@ -16,10 +17,12 @@ from .users.about import router as about_router
 from .users.zamer import router as zamer_router
 from .users.questions import router as questions_router
 from .users.contact import router as contact_router
+from .users.catalog import router as catalog_router
 
 def register_all_handlers(dp: Dispatcher):
     # Admin handlerlar
     dp.include_router(media_router)
+    dp.include_router(catalog_setup_router)
     dp.include_router(statistics_router) 
     dp.include_router(panel_router)
     dp.include_router(crm_router)
@@ -34,3 +37,4 @@ def register_all_handlers(dp: Dispatcher):
     dp.include_router(zamer_router)
     dp.include_router(questions_router)
     dp.include_router(contact_router)
+    dp.include_router(catalog_router)

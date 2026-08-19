@@ -215,6 +215,62 @@ async def get_template(template_id: int):
 async def delete_template(template_id: int):
     await db.execute("DELETE FROM mailing_templates WHERE id = $1", template_id)
 
+# ---------------------------------------------------------
+# KATALOG
+# ---------------------------------------------------------
+
+async def bind_catalog_topic(thread_id: int, category: str):
+    sql = """
+    INSERT INTO catalog_topics (thread_id, category)
+    VALUES ($1, $2)
+    ON CONFLICT (thread_id) DO UPDATE SET category = $2;
+    """
+    await db.execute(sql, thread_id, category)
+
+
+async def get_topic_category(thread_id: int):
+    row = await db.fetch("SELECT category FROM catalog_topics WHERE thread_id = $1", thread_id)
+    return row['category'] if row else None
+
+
+async def get_all_topic_bindings():
+    """{'garderob': 81, ...} — qaysi katalog qaysi topicka bog'langan"""
+    rows = await db.fetch_all("SELECT category, thread_id FROM catalog_topics")
+    return {r['category']: r['thread_id'] for r in rows}
+
+
+async def add_catalog_item(category: str, media_type: str, file_id: str, caption: str, src_msg_id: int):
+    sql = """
+    INSERT INTO catalog_items (category, media_type, file_id, caption, src_msg_id)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (src_msg_id) DO NOTHING;
+    """
+    await db.execute(sql, category, media_type, file_id, caption, src_msg_id)
+
+
+async def get_catalog_page(category: str, offset: int, limit: int):
+    sql = """
+    SELECT media_type, file_id, caption FROM catalog_items
+    WHERE category = $1 ORDER BY src_msg_id, id OFFSET $2 LIMIT $3;
+    """
+    return await db.fetch_all(sql, category, offset, limit)
+
+
+async def count_catalog(category: str):
+    row = await db.fetch("SELECT COUNT(*) FROM catalog_items WHERE category = $1", category)
+    return row['count']
+
+
+async def count_all_catalogs():
+    """{'garderob': 47, ...} ko'rinishida qaytaradi"""
+    rows = await db.fetch_all("SELECT category, COUNT(*) FROM catalog_items GROUP BY category")
+    return {r['category']: r['count'] for r in rows}
+
+
+async def clear_catalog(category: str):
+    await db.execute("DELETE FROM catalog_items WHERE category = $1", category)
+
+
 async def update_active_section(telegram_id: int, section: str):
     await db.execute("UPDATE users SET active_section = $1 WHERE telegram_id = $2", section, telegram_id)
 

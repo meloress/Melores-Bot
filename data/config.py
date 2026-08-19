@@ -12,3 +12,7 @@ TOPIC_ID_ALOQA= os.getenv("TOPIC_ID_ALOQA")
 TOPIC_ID_REMONT = os.getenv("TOPIC_ID_REMONT")
 TOPIC_ID_ZAMER = os.getenv("TOPIC_ID_ZAMER")
 TOPIC_ID_BIZ_HAQIMIZDA = os.getenv("TOPIC_ID_BIZ_HAQIMIZDA")
+
+# Katalog rasm/videolari turgan guruh (boshqa guruh bo'lishi mumkin).
+# Ko'rsatilmasa asosiy guruh ishlatiladi. ID ni bilish uchun: guruhda /id yozing.
+CATALOG_GROUP_ID = int(os.getenv("CATALOG_GROUP_ID") or MAIN_GROUP_ID)

@@ -88,7 +88,7 @@ async def send_lesson_to_user(bot, user_id, lesson_id):
     # B) AGAR VIDEO BOR BO'LSA (Yuboramiz)
     # ----------------------------------------------------
     builder = InlineKeyboardBuilder()
-    builder.button(text="Кейингиси ➡️", callback_data="next_lesson")
+    builder.button(text="🟢 Кейингиси ➡️", callback_data="next_lesson")
     
     try:
         sent_msg = await bot.send_video(
